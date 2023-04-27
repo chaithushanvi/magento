@@ -1,0 +1,50 @@
+#!/bin/sh
+
+service nginx start
+service mysql start
+service elasticsearch start
+service php7.4-fpm start
+
+cd /var/www/html
+composer self-update 2.0.0
+rm -rf magento
+composer create-project --no-interaction --repository-url=https://repo.magento.com/ magento/project-community-edition=2.4.3 /var/www/html/magento
+cd /var/www/html/magento
+
+find var generated vendor pub/static pub/media app/etc -type f -exec chmod g+w {} +
+
+find var generated vendor pub/static pub/media app/etc -type d -exec chmod g+ws {} +
+chown -R :www-data . 
+chmod -R  u+x bin/magento
+chmod -R 777 /var/www/html/magento
+
+bin/magento setup:install \
+--base-url=http://magento2.4.3.com/ \
+--db-host=localhost \
+--db-name=magento \
+--db-user=magento \
+--db-password=magento \
+--admin-firstname=admin \
+--admin-lastname=admin \
+--admin-email=admin@admin.com \
+--admin-user=admin \
+--admin-password=admin123 \
+--language=en_US \
+--currency=USD \
+--timezone=America/Chicago \
+--use-rewrites=1 \
+--search-engine=elasticsearch7 \
+--elasticsearch-host=localhost \
+--elasticsearch-port=9200
+
+php bin/magento module:disable Magento_TwoFactorAuth
+php bin/magento setup:upgrade
+php bin/magento setup:di:compile
+php bin/magento setup:static-content:deploy -f
+php bin/magento cache:clean
+php bin/magento cache:flush
+
+cp /var/www/html/env.php /var/www/html/magento/app/etc/env.php
+
+watch netstat -tulpn
+
